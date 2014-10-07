@@ -132,6 +132,15 @@ function exportFile(text,fileName){
     // returns a URL you can use as a href
     	
         a.href = textFile;
+        
+        if(sentTrans[0]!=undefined){
+        	if(sentTrans[0].length>20){
+        		fileName = sentTrans[0].substring(0,20);
+        	}else{
+        		fileName = sentTrans[0].substring(0,sentTrans[0].length);
+        	}
+        }
+        
         a.download = fileName;
         a.click();
         window.URL.revokeObjectURL(textFile);
