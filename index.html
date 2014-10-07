@@ -1,0 +1,356 @@
+<html>
+<head>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
+</head>
+<body id = "body">
+	<div>
+		<input type="submit" onclick="prv()" value="Prev Page">
+		<input type="submit" onclick="nxt()" value="Next Page">	||	
+		<input placeholder = "original" type="text" id = "transBox">  
+		<input placeholder = "translation" type="text" id = "textBox">
+		<input id ="sub" type="submit" onclick="start(false)" value="Submit"> ||
+		<input type="submit" onclick="exportFile(plainText,'file')" value="Export">
+		<input type="file" id="fileinput" style="display:none" />
+		<input type="submit" onclick="chooseFile()" value="Import">||
+		<input type="submit" onclick="getTXT()" value="Get TXT">
+		
+		
+	
+	</div>
+	
+	<div>
+		<div style="display: inline-block;
+					  z-index: 998;
+					  width: 49%;
+					  padding:4px;
+					  vertical-align: top;" id="out" ></div>
+
+		<div style="display: inline-block;
+					  z-index: 998;
+					  width: 49%;
+					  padding:4px;
+					  vertical-align: top;" id="out2" ></div>
+	</div>		  
+
+	<div id ='outputMain' style = " z-index: 1;
+    position: absolute;
+    left: 1%;
+    right: 1%;
+    bottom: 20px;
+    height: 300px;
+    background-color: lightgray;
+    color: black;
+    overflow:auto;
+    display:none;
+    padding: 4px;">
+    	<input type="submit" onclick="closeOut()" value="Close">
+    	<div id="outTXT"></div>
+	</div>
+
+</body>
+</html>
+
+<script>
+
+var sentences;
+var sentTrans;
+var pages = new Array();
+var currentPage = 0;
+var stop = false;
+var tempPages = new Array();
+var plainText = "";
+var importedText = "" ,importedTrans = "";
+
+document.getElementById('fileinput').addEventListener('change', readSingleFile, false);
+
+function chooseFile(){
+	document.getElementById("fileinput").click();
+}
+
+function readSingleFile(evt) {
+    //Retrieve the first (and only!) File from the FileList object
+    var f = evt.target.files[0]; 
+
+    if (f) {
+      var r = new FileReader();
+      r.onload = function(e) { 
+	      var contents = e.target.result;
+        //console.log(contents);
+        importFile(contents);
+      }
+      r.readAsText(f);
+    } else { 
+      alert("Failed to load file");
+    }
+ }
+
+function importFile(contents){
+
+	var init = new Array();
+	init = contents.split("beginoriginaltext");
+
+	for(var c = 1;c<init.length;c++){
+		importedTrans+=init[c].split("begintranslatedtext")[0];
+		importedText+=init[c].split("begintranslatedtext")[1];
+	}
+
+	
+	console.log("\n");
+	
+	start(true);
+} 
+
+function exportFile(text,fileName){
+
+	var textFile = null;
+	var D = document;
+	var a = D.createElement("a");
+	var data = new Blob([text], {type: 'text/plain'});
+
+    // If we are replacing a previously generated file we need to
+    // manually revoke the object URL to avoid memory leaks.
+    if (textFile !== null) {
+      window.URL.revokeObjectURL(textFile);
+    }
+
+    textFile = window.URL.createObjectURL(data);
+
+    // returns a URL you can use as a href
+    	
+        a.href = textFile;
+        a.download = fileName;
+        a.click();
+        window.URL.revokeObjectURL(textFile);
+
+}
+
+function closeOut(){
+	document.getElementById('outputMain').style.display = "none";
+}
+
+function getTXT(){
+	
+
+
+	var text = "";
+
+	for(var c = 0;c<sentences.length;c++){
+		if(sentences[c]==undefined||sentTrans[c]==undefined){continue;
+		}else{
+		text += sentTrans[c]+  ".<br/><br/>" + sentences[c]  + ".<br/><br/>";
+		//console.log("building");
+		}
+	}	
+
+	document.getElementById('outTXT').innerHTML = "";
+	document.getElementById('outTXT').innerHTML = text;
+	document.getElementById('outputMain').style.display = "block";
+}
+
+function start (imped){
+
+	if(document.getElementById('textBox').value==""
+	&&!imped||document.getElementById('transBox').value==""&&!imped){
+		console.log("no input");return;
+	}
+
+	if(!imped){
+		var text = document.getElementById('textBox').value;
+		var trans = document.getElementById('transBox').value;
+	}else{
+		var text = importedText;
+		var trans = importedTrans;
+		pages = new Array();	
+	}
+
+	document.getElementById('sub').value = "Add";
+
+	//check if multipart
+
+	if(pages.length>0){
+		pages[pages.length-1].isEnd = false;
+		for (var c = 0;c<pages.length;c++){
+			tempPages[c] = pages[c];
+		}
+		
+	}
+
+	currentPage = 0;
+	pages = new Array();
+
+
+	plainText+="beginoriginaltext";
+	plainText+=trans;
+	plainText+="begintranslatedtext";
+	plainText+=text;
+	
+	document.getElementById('textBox').value = "";
+	document.getElementById('transBox').value = "";
+
+	//var text = text.replace(":",".");
+	//var trans = trans.replace(":",".");
+
+	//var text = text.replace(";",".");
+	//var trans = trans.replace(";",".");
+
+	sentences = new Array();
+	sentTrans = new Array();
+	sentences = text.split(".");
+	sentTrans = trans.split(".");
+
+	for(var c = 0;c<sentences.length;c++){
+		//if(sentences[c] == undefined){sentences.splice(sentences.indexOf(sentences[c]),1);c--;console.log("spliced")}
+
+		//if(sentTrans[c] == undefined){sentTrans.splice(sentTrans.indexOf(sentTrans[c]),1);c--;console.log("spliced")}
+	}
+
+	pages[0] = new page(0,5);
+	build();
+	checkPageSize();
+	while(!pages[currentPage].isEnd){
+		nxtB();
+	}
+	currentPage = 0;
+
+	if(tempPages.length>0){
+		for (var c = 0;c<pages.length;c++){
+			tempPages.push(pages[c]);
+		}
+
+		for (var c = 0;c<tempPages.length;c++){
+		pages[c] = tempPages[c];
+		}
+	}	
+	place();
+
+	//console.log(pages);
+}
+
+function build(){
+
+	document.getElementById('out').innerHTML = "";
+	document.getElementById('out2').innerHTML = "";
+
+	var start = pages[currentPage].start;
+	var end = pages[currentPage].end;
+    
+	var out = "<p><center>";
+
+	//for(var c = 1;c<pages.length;c++){
+		//if(pages[c]==pages[currentPage]){
+			out+=currentPage+tempPages.length+1;
+		//}else{
+		//	out+="-";
+		//}
+	//}
+
+	out += "</center></p>";
+
+	//if(currentPage%2==0){out = "";}
+
+	for(var c = start;c<end;c++){
+		if(sentences[c]==undefined||sentTrans[c]==undefined){pages[currentPage].isEnd = true;
+		out += "</br>";
+		}else{
+		out +="<p>" +  sentTrans[c] + ".</p><p style=\"color:gray\">" + sentences[c]+ ".<p/>";
+		//console.log("building");
+		}
+	}	
+
+	pages[currentPage].html = out;
+	document.getElementById('out').innerHTML = "";
+	document.getElementById('out').innerHTML = out;
+
+}
+
+function nxtB(){
+	if(pages[currentPage].isEnd){build();return;}
+	currentPage++;
+
+	if(pages[currentPage]==null){
+		
+		var start = pages[currentPage-1].end;
+		var end = pages[currentPage-1].end+5;
+		if(end>sentences.length){end=sentences.length;}
+
+		pages[currentPage] = new page(start,end);
+		build();
+		checkPageSize();
+	}
+	build();
+}
+
+function place(){
+
+	//console.log(currentPage);
+
+	document.getElementById('out').innerHTML = pages[currentPage].html;
+	if(pages[currentPage+1]!=undefined){
+	document.getElementById('out2').innerHTML = pages[currentPage+1].html;
+	}else{
+		document.getElementById('out2').innerHTML = "";
+	}
+}
+
+function nxt(){
+	if(pages[currentPage+2]==undefined){return;}
+	currentPage+=2;
+	place();
+}
+
+function prv(){
+	if(currentPage==0){return;}
+	currentPage-=2;
+	place();
+
+	
+}
+
+function checkPageSize(){
+	
+
+	var scroll = false;
+	
+	while(!scroll){
+
+		$(document).scrollTop(1);
+
+		if($(document).scrollTop() != 0){
+		   scroll = true;
+		}else{scroll = false;}
+
+		$(document).scrollTop(0);
+
+		if(!scroll){pages[currentPage].end++;build();}
+		console.log("c1");
+
+	}
+
+	while(scroll){
+
+		$(document).scrollTop(1);
+
+		if($(document).scrollTop() != 0){
+		   scroll = true;
+		}else{scroll = false;}
+
+		$(document).scrollTop(0);
+
+		if(scroll){pages[currentPage].end--;build();}
+		console.log("c2");
+
+	}
+
+}
+
+function page(start,end){
+	this.start = start;
+	this.end = end;
+	this.isEnd = false;
+	this.html = "";
+	this.isChapter = false;
+}
+
+
+
+</script>
